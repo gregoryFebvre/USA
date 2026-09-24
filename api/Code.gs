@@ -4,7 +4,7 @@
  * Lecture : publique (GET). Écriture : code éditeur requis (POST).
  */
 const CFG = { SHEET: "Démarchage", EDITORS: "Editeurs", LISTS: "Listes", LOG: "Historique", MAX_FAILS: 15 };
-const HEADERS = ["ID", "Qui", "Où", "Démarché par", "Type de contact", "Réponse", "Montant du don", "Niveau de sponsoring", "Note", "Créé le", "Modifié le", "Modifié par"];
+const HEADERS = ["ID", "Qui", "Où", "Démarché par", "Type de contact", "Réponse", "Montant du don", "Niveau de sponsoring", "Note", "Créé le", "Modifié le", "Modifié par", "CERFA", "N° de reçu"];
 
 /* ---------- Installation (à lancer UNE fois) ---------- */
 function setup() {
@@ -13,10 +13,10 @@ function setup() {
   const sh = get(CFG.SHEET) || ss.insertSheet(CFG.SHEET);
   sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight("bold").setBackground("#0F6B6B").setFontColor("#ffffff");
   sh.setFrozenRows(1);
-  ["A:F", "H:I", "L:L"].forEach(r => sh.getRange(r).setNumberFormat("@")); // texte : aucune formule interprétée
+  ["A:F", "H:I", "L:N"].forEach(r => sh.getRange(r).setNumberFormat("@")); // texte : aucune formule interprétée
   sh.getRange("G:G").setNumberFormat("#,##0.00 \"€\"");
   sh.getRange("J:K").setNumberFormat("dd/MM/yyyy HH:mm");
-  sh.setColumnWidths(1, 12, 150);
+  sh.setColumnWidths(1, 14, 150);
 
   let li = get(CFG.LISTS);
   if (!li) {
@@ -34,6 +34,8 @@ function setup() {
     const rule = SpreadsheetApp.newDataValidation().requireValueInRange(li.getRange(src + "2:" + src), true).setAllowInvalid(false).build();
     sh.getRange(col + "2:" + col).setDataValidation(rule);
   });
+
+  sh.getRange("M2:M").setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(["OUI", "NON"], true).setAllowInvalid(false).build());
 
   let ed = get(CFG.EDITORS);
   if (!ed) {
@@ -104,12 +106,12 @@ function readAll() {
   const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET);
   if (sh.getLastRow() < 2) return [];
   const iso = v => v instanceof Date ? v.toISOString() : String(v || "");
-  return sh.getRange(2, 1, sh.getLastRow() - 1, 12).getValues()
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 14).getValues()
     .filter(r => r[0] && String(r[1]).trim())
     .map(r => ({
       id: String(r[0]), qui: String(r[1]), ou: String(r[2]), demarchePar: String(r[3]), type: String(r[4]),
       reponse: String(r[5]), montant: r[6] === "" ? "" : Number(r[6]), niveau: String(r[7]), note: String(r[8]),
-      creeLe: iso(r[9]), modifieLe: iso(r[10]), modifiePar: String(r[11])
+      creeLe: iso(r[9]), modifieLe: iso(r[10]), modifiePar: String(r[11]), cerfa: String(r[12]), numero: String(r[13])
     }));
 }
 
@@ -128,9 +130,13 @@ function save(b, user) {
   try {
     const sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CFG.SHEET);
     const now = new Date(); now.setMilliseconds(0);
+    if (d.numero) {
+      const all = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, 14).getValues() : [];
+      if (all.some(r => String(r[13]).trim() === d.numero && String(r[0]) !== String(b.data.id || ""))) fail("Ce numéro de reçu est déjà utilisé.");
+    }
     if (b.action === "create") {
       const id = Utilities.getUuid().slice(0, 8);
-      sh.appendRow([id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, now, now, user]);
+      sh.appendRow([id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, now, now, user, d.cerfa, d.numero]);
       log(user, "create", id, "", d);
       return { ok: true, data: { id } };
     }
@@ -139,10 +145,10 @@ function save(b, user) {
     const i = id ? ids.indexOf(id) : -1;
     if (i < 0) fail("Ligne introuvable (supprimée ?). Rechargez la page.");
     const r = i + 2;
-    const cur = sh.getRange(r, 1, 1, 12).getValues()[0];
+    const cur = sh.getRange(r, 1, 1, 14).getValues()[0];
     const curMod = (cur[10] instanceof Date ? cur[10].toISOString() : String(cur[10])).slice(0, 19);
     if (String(b.data.modifieLe || "").slice(0, 19) !== curMod) fail("Cette ligne a été modifiée entre-temps. Rechargez la page.");
-    sh.getRange(r, 1, 1, 12).setValues([[id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, cur[9], now, user]]);
+    sh.getRange(r, 1, 1, 14).setValues([[id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, cur[9], now, user, d.cerfa, d.numero]]);
     log(user, "update", id, cur.slice(1, 9), d);
     return { ok: true, data: { id } };
   } finally { lock.releaseLock(); }
@@ -151,11 +157,13 @@ function save(b, user) {
 function clean(x) {
   const L = readLists();
   const s = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
-  const d = { qui: s(x.qui, 200), ou: s(x.ou, 200), demarchePar: s(x.demarchePar, 100), type: s(x.type, 50), reponse: s(x.reponse, 50), niveau: s(x.niveau, 50), note: s(x.note, 2000) };
+  const d = { qui: s(x.qui, 200), ou: s(x.ou, 200), demarchePar: s(x.demarchePar, 100), type: s(x.type, 50), reponse: s(x.reponse, 50), niveau: s(x.niveau, 50), note: s(x.note, 2000), cerfa: s(x.cerfa, 3).toUpperCase(), numero: s(x.numero, 20) };
   if (!d.qui) fail("Le champ « Qui » est obligatoire.");
   if (d.type && L.type.indexOf(d.type) < 0) fail("Type de contact invalide.");
   if (d.reponse && L.reponse.indexOf(d.reponse) < 0) fail("Réponse invalide.");
   if (d.niveau && L.niveau.indexOf(d.niveau) < 0) fail("Niveau de sponsoring invalide.");
+  if (d.cerfa && d.cerfa !== "OUI" && d.cerfa !== "NON") fail("CERFA : choisissez OUI ou NON.");
+  if (d.numero && !/^[A-Za-z0-9\/-]{1,20}$/.test(d.numero)) fail("N° de reçu invalide (lettres, chiffres, tiret ou barre oblique).");
   if (x.montant === "" || x.montant == null) d.montant = "";
   else {
     const n = Number(String(x.montant).replace(",", "."));
