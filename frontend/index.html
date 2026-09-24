@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Démarchage de dons</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div><h1>Démarchage de dons</h1><p id="summary" aria-live="polite">Chargement…</p></div>
+  <div class="actions">
+    <span id="who"></span>
+    <button id="btnAdd" hidden>Ajouter un contact</button>
+    <button id="btnLogin" class="ghost">Espace éditeur</button>
+  </div>
+</header>
+<main>
+  <div id="banner" class="banner" hidden></div>
+  <section class="tools" aria-label="Recherche et filtres">
+    <input id="q" type="search" placeholder="Rechercher un nom, un lieu, une note…" aria-label="Recherche">
+    <select id="fType" aria-label="Type de contact"></select>
+    <select id="fReponse" aria-label="Réponse"></select>
+    <select id="fNiveau" aria-label="Niveau de sponsoring"></select>
+    <select id="fDemarchePar" aria-label="Démarché par"></select>
+    <button id="btnReset" class="ghost">Effacer les filtres</button>
+  </section>
+  <div class="tablewrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <nav class="pager" aria-label="Pagination">
+    <button id="prev" class="ghost">Précédent</button><span id="pageInfo"></span><button id="next" class="ghost">Suivant</button>
+  </nav>
+</main>
+
+<dialog id="dlgLogin">
+  <form id="loginForm" method="dialog">
+    <h2>Espace éditeur</h2>
+    <p class="hint">Saisissez le code fourni par l administrateur pour modifier la liste.</p>
+    <label>Code d accès<input name="code" type="password" autocomplete="current-password" required minlength="8"></label>
+    <p class="err" id="loginErr" role="alert"></p>
+    <div class="row"><button type="button" class="ghost" data-close>Annuler</button><button type="submit">Se connecter</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgForm">
+  <form id="form" method="dialog">
+    <h2 id="formTitle">Ajouter un contact</h2>
+    <input type="hidden" name="rid"><input type="hidden" name="rmod">
+    <div class="grid">
+      <label>Qui *<input name="qui" required maxlength="200"></label>
+      <label>Où<input name="ou" maxlength="200"></label>
+      <label>Démarché par<input name="demarchePar" list="dlPeople" maxlength="100"></label>
+      <datalist id="dlPeople"></datalist>
+      <label>Type de contact<select name="type"></select></label>
+      <label>Réponse<select name="reponse"></select></label>
+      <label>Montant du don (€)<input name="montant" inputmode="decimal" placeholder="0,00"></label>
+      <label>Niveau de sponsoring<select name="niveau"></select></label>
+      <label class="wide">Note<textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    </div>
+    <p class="err" id="formErr" role="alert"></p>
+    <div class="row"><button type="button" class="ghost" data-close>Annuler</button><button type="submit" id="btnSave">Enregistrer</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
