@@ -4,10 +4,10 @@ const API = window.CONFIG.API_URL;
 const COLS = [
   { k: "qui", t: "Qui" }, { k: "ou", t: "Où" }, { k: "demarchePar", t: "Démarché par" },
   { k: "type", t: "Type de contact" }, { k: "reponse", t: "Réponse" },
-  { k: "montant", t: "Don", num: true }, { k: "niveau", t: "Sponsoring" }, { k: "note", t: "Note" }
+  { k: "montant", t: "Don", num: true }, { k: "cerfa", t: "CERFA" }, { k: "numero", t: "N° de reçu" }, { k: "niveau", t: "Sponsoring" }, { k: "note", t: "Note" }
 ];
 const $ = s => document.querySelector(s);
-const st = { rows: [], lists: { type: [], reponse: [], niveau: [] }, q: "", f: { type: "", reponse: "", niveau: "", demarchePar: "" },
+const st = { rows: [], lists: { type: [], reponse: [], niveau: [] }, q: "",
   sort: { k: "modifieLe", dir: -1 }, page: 1, size: 25, token: sessionStorage.getItem("tok") || "", user: sessionStorage.getItem("usr") || "" };
 const esc = s => String(s ?? "").replace(/[&<>"\x27]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "\x27": "&#39;" }[c]));
 const norm = s => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -35,7 +35,7 @@ async function load() {
     const d = await call();
     st.rows = d.rows; st.lists = d.lists;
     $("#banner").hidden = true;
-    fillFilters(); render();
+    fillPeople(); render();
   } catch (e) {
     $("#banner").hidden = false; $("#banner").textContent = e.message;
     $("#summary").textContent = "Données indisponibles.";
@@ -46,19 +46,21 @@ function fillSelect(sel, label, values, keep) {
   sel.innerHTML = `<option value="">${esc(label)}</option>` + values.map(v => `<option>${esc(v)}</option>`).join("");
   sel.value = keep || "";
 }
-function fillFilters() {
+function fillPeople() {
   const people = [...new Set(st.rows.map(r => r.demarchePar).filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
-  fillSelect($("#fType"), "Tous les types", st.lists.type, st.f.type);
-  fillSelect($("#fReponse"), "Toutes les réponses", st.lists.reponse, st.f.reponse);
-  fillSelect($("#fNiveau"), "Tous les niveaux", st.lists.niveau, st.f.niveau);
-  fillSelect($("#fDemarchePar"), "Tous les démarcheurs", people, st.f.demarchePar);
   $("#dlPeople").innerHTML = people.map(p => `<option value="${esc(p)}">`).join("");
+}
+
+function lastReceipt() {
+  const withNum = st.rows.filter(r => r.numero);
+  if (!withNum.length) return "Aucun numéro de reçu enregistré";
+  const last = withNum.reduce((a, b) => String(b.numero).localeCompare(String(a.numero), "fr", { numeric: true }) > 0 ? b : a);
+  return `Dernier n° de reçu : ${last.numero} (${last.qui})`;
 }
 
 function view() {
   const q = norm(st.q);
-  const r = st.rows.filter(x => (!q || norm(COLS.map(c => x[c.k]).join(" ")).includes(q)) &&
-    Object.entries(st.f).every(([k, v]) => !v || x[k] === v));
+  const r = st.rows.filter(x => !q || norm(COLS.map(c => x[c.k]).join(" ")).includes(q));
   const { k, dir } = st.sort;
   r.sort(k === "montant"
     ? (a, b) => ((a[k] === "" ? -1 : a[k]) - (b[k] === "" ? -1 : b[k])) * dir
@@ -72,6 +74,7 @@ function render() {
   st.page = Math.min(st.page, pages);
   const slice = all.slice((st.page - 1) * st.size, st.page * st.size);
   const total = all.reduce((s, r) => s + (Number(r.montant) || 0), 0);
+  $("#lastReceipt").textContent = lastReceipt();
   $("#summary").textContent = `${all.length} contact${all.length > 1 ? "s" : ""}, ${eur(total) || "0 €"} de dons`;
 
   $("#thead").innerHTML = "<tr>" + COLS.map(c => {
@@ -81,10 +84,10 @@ function render() {
 
   $("#tbody").innerHTML = slice.length ? slice.map(r => "<tr>" + COLS.map(c => {
     if (c.k === "montant") return `<td class="num">${esc(eur(r.montant))}</td>`;
-    if (c.k === "reponse" || c.k === "niveau" || c.k === "type") return `<td>${r[c.k] ? `<span class="tag${r[c.k] === "Accepté" ? " ok" : ""}">${esc(r[c.k])}</span>` : ""}</td>`;
+    if (c.k === "reponse" || c.k === "niveau" || c.k === "type" || c.k === "cerfa") return `<td>${r[c.k] ? `<span class="tag${(r[c.k] === "Accepté" || r[c.k] === "OUI") ? " ok" : ""}">${esc(r[c.k])}</span>` : ""}</td>`;
     return `<td class="${c.k === "note" ? "note" : ""}">${esc(r[c.k])}</td>`;
   }).join("") + (st.token ? `<td><button class="ghost" data-edit="${esc(r.id)}">Modifier</button></td>` : "") + "</tr>").join("")
-    : `<tr><td class="empty" colspan="9">Aucun contact ne correspond à cette recherche.</td></tr>`;
+    : `<tr><td class="empty" colspan="11">Aucun contact ne correspond à cette recherche.</td></tr>`;
 
   $("#pageInfo").textContent = `Page ${st.page} sur ${pages}`;
   $("#prev").disabled = st.page <= 1; $("#next").disabled = st.page >= pages;
@@ -110,12 +113,12 @@ $("#loginForm").onsubmit = async e => {
 /* ----- Formulaire ----- */
 function openForm(row) {
   const f = $("#form"); f.reset();
-  fillSelect(f.type, "—", st.lists.type); fillSelect(f.reponse, "—", st.lists.reponse); fillSelect(f.niveau, "—", st.lists.niveau);
+  fillSelect(f.type, "—", st.lists.type); fillSelect(f.reponse, "—", st.lists.reponse); fillSelect(f.niveau, "—", st.lists.niveau); fillSelect(f.cerfa, "—", ["OUI", "NON"]);
   $("#formTitle").textContent = row ? "Modifier le contact" : "Ajouter un contact";
   $("#formErr").textContent = "";
   const r = row || {};
   f.rid.value = r.id || ""; f.rmod.value = r.modifieLe || "";
-  ["qui", "ou", "demarchePar", "type", "reponse", "niveau", "note"].forEach(k => f[k].value = r[k] || "");
+  ["qui", "ou", "demarchePar", "type", "reponse", "niveau", "note", "cerfa", "numero"].forEach(k => f[k].value = r[k] || "");
   f.montant.value = r.montant === "" || r.montant == null ? "" : String(r.montant).replace(".", ",");
   $("#dlgForm").showModal();
 }
@@ -124,10 +127,11 @@ $("#form").onsubmit = async e => {
   e.preventDefault();
   const f = e.target, err = $("#formErr");
   const d = { id: f.rid.value, modifieLe: f.rmod.value, qui: f.qui.value.trim(), ou: f.ou.value.trim(), demarchePar: f.demarchePar.value.trim(),
-    type: f.type.value, reponse: f.reponse.value, niveau: f.niveau.value, note: f.note.value.trim(), montant: f.montant.value.trim() };
+    type: f.type.value, reponse: f.reponse.value, niveau: f.niveau.value, note: f.note.value.trim(), montant: f.montant.value.trim(), cerfa: f.cerfa.value, numero: f.numero.value.trim() };
   if (!d.qui) { err.textContent = "Indiquez qui est démarché."; return; }
   const n = Number(d.montant.replace(",", "."));
   if (d.montant && (!isFinite(n) || n < 0)) { err.textContent = "Le montant doit être un nombre positif."; return; }
+  if (d.numero && !/^[A-Za-z0-9\/-]{1,20}$/.test(d.numero)) { err.textContent = "N° de reçu : lettres, chiffres, tiret ou barre oblique uniquement."; return; }
   const btn = $("#btnSave"); btn.disabled = true; btn.textContent = "Enregistrement…"; err.textContent = "";
   try {
     await call({ action: d.id ? "update" : "create", token: st.token, data: d });
@@ -141,9 +145,6 @@ document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => b.close
 
 /* ----- Événements liste ----- */
 $("#q").oninput = e => { st.q = e.target.value; st.page = 1; render(); };
-[["#fType", "type"], ["#fReponse", "reponse"], ["#fNiveau", "niveau"], ["#fDemarchePar", "demarchePar"]]
-  .forEach(([id, k]) => $(id).onchange = e => { st.f[k] = e.target.value; st.page = 1; render(); });
-$("#btnReset").onclick = () => { st.q = ""; $("#q").value = ""; Object.keys(st.f).forEach(k => st.f[k] = ""); fillFilters(); st.page = 1; render(); };
 $("#prev").onclick = () => { st.page--; render(); };
 $("#next").onclick = () => { st.page++; render(); };
 $("#thead").onclick = e => {
