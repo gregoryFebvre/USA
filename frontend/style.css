@@ -11,9 +11,9 @@ button.ghost{background:transparent;color:var(--accent)}
 button:disabled{opacity:.5;cursor:wait}
 :focus-visible{outline:3px solid #e0a100;outline-offset:2px}
 input,select,textarea{font:inherit;width:100%;padding:.5rem .6rem;border:1px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--ink)}
-.tools{display:grid;grid-template-columns:2fr repeat(4,1fr) auto;gap:.5rem;margin-bottom:1rem}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.5rem;margin-bottom:1rem}.tools #q{flex:1 1 20rem}.info{margin:0;padding:.45rem .8rem;border:1px solid var(--accent);border-radius:var(--radius);color:var(--accent);font-weight:700;background:#fff}
 .tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:var(--radius)}
-table{border-collapse:collapse;width:100%;min-width:900px}
+table{border-collapse:collapse;width:100%;min-width:1100px}
 th,td{padding:.6rem .75rem;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 th{background:#e8eef0;position:sticky;top:0;white-space:nowrap}
 th button{all:unset;cursor:pointer;font-weight:700}
@@ -33,5 +33,5 @@ label{display:block;font-weight:700}label input,label select,label textarea{marg
 .err{color:var(--warn);min-height:1.5em;margin:.5rem 0 0}.hint{color:var(--muted)}
 #toast{position:fixed;left:50%;bottom:1.5rem;transform:translate(-50%,2rem);background:var(--ink);color:#fff;padding:.7rem 1.1rem;border-radius:var(--radius);opacity:0;pointer-events:none;transition:.2s}
 #toast.show{opacity:1;transform:translate(-50%,0)}#toast.bad{background:var(--warn)}
-@media(max-width:800px){.tools{grid-template-columns:1fr 1fr}.tools #q{grid-column:1/-1}.grid{grid-template-columns:1fr}}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){#toast{transition:none}}
