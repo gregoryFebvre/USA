@@ -136,7 +136,9 @@ function save(b, user) {
     }
     if (b.action === "create") {
       const id = Utilities.getUuid().slice(0, 8);
-      sh.appendRow([id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, now, now, user, d.cerfa, d.numero]);
+      const r = sh.getLastRow() + 1;
+      sh.getRange(r, 14).setNumberFormat("@"); // force le texte : évite la perte des zéros initiaux (ex. "004")
+      sh.getRange(r, 1, 1, 14).setValues([[id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, now, now, user, d.cerfa, d.numero]]);
       log(user, "create", id, "", d);
       return { ok: true, data: { id } };
     }
@@ -148,6 +150,7 @@ function save(b, user) {
     const cur = sh.getRange(r, 1, 1, 14).getValues()[0];
     const curMod = (cur[10] instanceof Date ? cur[10].toISOString() : String(cur[10])).slice(0, 19);
     if (String(b.data.modifieLe || "").slice(0, 19) !== curMod) fail("Cette ligne a été modifiée entre-temps. Rechargez la page.");
+    sh.getRange(r, 14).setNumberFormat("@"); // force le texte : évite la perte des zéros initiaux (ex. "004")
     sh.getRange(r, 1, 1, 14).setValues([[id, d.qui, d.ou, d.demarchePar, d.type, d.reponse, d.montant, d.niveau, d.note, cur[9], now, user, d.cerfa, d.numero]]);
     log(user, "update", id, cur.slice(1, 9), d);
     return { ok: true, data: { id } };
